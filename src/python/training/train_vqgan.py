@@ -126,7 +126,6 @@ def main(args):
         writer_val=writer_val,
         device=device,
         run_dir=run_dir,
-        kl_weight=config["stage1"]["kl_weight"],
         adv_weight=config["stage1"]["adv_weight"],
         perceptual_weight=config["stage1"]["perceptual_weight"],
         adv_start=args.adv_start,

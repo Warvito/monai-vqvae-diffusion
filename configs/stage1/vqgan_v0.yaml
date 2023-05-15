@@ -3,7 +3,6 @@ stage1:
   disc_lr: 0.0001
   perceptual_weight: 0.002
   adv_weight: 0.005
-  kl_weight: 0.00000001
   params:
     spatial_dims: 2
     in_channels: 1
@@ -11,9 +10,10 @@ stage1:
     num_channels: [64, 128, 128, 128]
     latent_channels: 3
     num_res_blocks: 2
-    attention_levels: [False, False, False, False]
-    with_encoder_nonlocal_attn: False
-    with_decoder_nonlocal_attn: False
+    downsample_parameters: [[2, 4, 1, 1], [2, 4, 1, 1], [2, 4, 1, 1]]
+    upsample_parameters: [[2, 4, 1, 1, 0], [2, 4, 1, 1, 0], [2, 4, 1, 1, 0]]
+    num_embeddings: 256
+    embedding_dim: 32
 
 discriminator:
   params:

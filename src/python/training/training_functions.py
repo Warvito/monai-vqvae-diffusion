@@ -49,7 +49,6 @@ def train_vqgan(
     run_dir: Path,
     adv_weight: float,
     perceptual_weight: float,
-    kl_weight: float,
     adv_start: int,
 ) -> float:
     scaler_g = GradScaler()
@@ -65,7 +64,6 @@ def train_vqgan(
         device=device,
         step=len(train_loader) * start_epoch,
         writer=writer_val,
-        kl_weight=kl_weight,
         adv_weight=adv_weight if start_epoch >= adv_start else 0.0,
         perceptual_weight=perceptual_weight,
     )
@@ -81,7 +79,6 @@ def train_vqgan(
             device=device,
             epoch=epoch,
             writer=writer_train,
-            kl_weight=kl_weight,
             adv_weight=adv_weight if epoch >= adv_start else 0.0,
             perceptual_weight=perceptual_weight,
             scaler_g=scaler_g,
@@ -97,7 +94,6 @@ def train_vqgan(
                 device=device,
                 step=len(train_loader) * epoch,
                 writer=writer_val,
-                kl_weight=kl_weight,
                 adv_weight=adv_weight if epoch >= adv_start else 0.0,
                 perceptual_weight=perceptual_weight,
             )
@@ -136,7 +132,6 @@ def train_epoch_vqgan(
     device: torch.device,
     epoch: int,
     writer: SummaryWriter,
-    kl_weight: float,
     adv_weight: float,
     perceptual_weight: float,
     scaler_g: GradScaler,
@@ -238,7 +233,6 @@ def eval_vqgan(
     device: torch.device,
     step: int,
     writer: SummaryWriter,
-    kl_weight: float,
     adv_weight: float,
     perceptual_weight: float,
 ) -> float:
