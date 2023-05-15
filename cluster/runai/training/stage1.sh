@@ -24,7 +24,7 @@ runai submit \
   --volume /nfs/home/wds20/projects/monai-vqvae-diffusion/:/project/ \
   --volume /nfs/home/wds20/datasets/MIMIC-CXR-JPG_v2.0.0/:/data/ \
   --command -- bash /project/src/bash/start_script.sh \
-    python3 /project/src/python/training/train_aekl.py \
+    python3 /project/src/python/training/train_vqgan.py \
       seed=${seed} \
       run_dir=${run_dir} \
       training_ids=${training_ids} \
