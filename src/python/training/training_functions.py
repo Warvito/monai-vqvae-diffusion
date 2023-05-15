@@ -149,7 +149,7 @@ def train_epoch_vqgan(
         # GENERATOR
         optimizer_g.zero_grad(set_to_none=True)
         with autocast(enabled=True):
-            reconstruction, quantization_loss = model(x=images)
+            reconstruction, quantization_loss = model(images)
             l1_loss = F.l1_loss(reconstruction.float(), images.float())
             p_loss = perceptual_loss(reconstruction.float(), images.float())
 
@@ -246,7 +246,7 @@ def eval_vqgan(
 
         with autocast(enabled=True):
             # GENERATOR
-            reconstruction, quantization_loss = model(x=images)
+            reconstruction, quantization_loss = model(images)
             l1_loss = F.l1_loss(reconstruction.float(), images.float())
             p_loss = perceptual_loss(reconstruction.float(), images.float())
 
