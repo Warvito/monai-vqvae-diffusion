@@ -31,7 +31,7 @@ def print_gpu_memory_report():
 # ----------------------------------------------------------------------------------------------------------------------
 # AUTOENCODER KL
 # ----------------------------------------------------------------------------------------------------------------------
-def train_aekl(
+def train_vqgan(
     model: nn.Module,
     discriminator: nn.Module,
     perceptual_loss: nn.Module,
@@ -57,7 +57,7 @@ def train_aekl(
 
     raw_model = model.module if hasattr(model, "module") else model
 
-    val_loss = eval_aekl(
+    val_loss = eval_vqgan(
         model=model,
         discriminator=discriminator,
         perceptual_loss=perceptual_loss,
@@ -71,7 +71,7 @@ def train_aekl(
     )
     print(f"epoch {start_epoch} val loss: {val_loss:.4f}")
     for epoch in range(start_epoch, n_epochs):
-        train_epoch_aekl(
+        train_epoch_vqgan(
             model=model,
             discriminator=discriminator,
             perceptual_loss=perceptual_loss,
@@ -89,7 +89,7 @@ def train_aekl(
         )
 
         if (epoch + 1) % eval_freq == 0:
-            val_loss = eval_aekl(
+            val_loss = eval_vqgan(
                 model=model,
                 discriminator=discriminator,
                 perceptual_loss=perceptual_loss,
@@ -126,7 +126,7 @@ def train_aekl(
     return val_loss
 
 
-def train_epoch_aekl(
+def train_epoch_vqgan(
     model: nn.Module,
     discriminator: nn.Module,
     perceptual_loss: nn.Module,
@@ -154,12 +154,9 @@ def train_epoch_aekl(
         # GENERATOR
         optimizer_g.zero_grad(set_to_none=True)
         with autocast(enabled=True):
-            reconstruction, z_mu, z_sigma = model(x=images)
+            reconstruction, quantization_loss = model(x=images)
             l1_loss = F.l1_loss(reconstruction.float(), images.float())
             p_loss = perceptual_loss(reconstruction.float(), images.float())
-
-            kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
-            kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
 
             if adv_weight > 0:
                 logits_fake = discriminator(reconstruction.contiguous().float())[-1]
@@ -167,19 +164,19 @@ def train_epoch_aekl(
             else:
                 generator_loss = torch.tensor([0.0]).to(device)
 
-            loss = l1_loss + kl_weight * kl_loss + perceptual_weight * p_loss + adv_weight * generator_loss
+            loss = l1_loss + quantization_loss + perceptual_weight * p_loss + adv_weight * generator_loss
 
             loss = loss.mean()
             l1_loss = l1_loss.mean()
             p_loss = p_loss.mean()
-            kl_loss = kl_loss.mean()
+            quantization_loss = quantization_loss.mean()
             g_loss = generator_loss.mean()
 
             losses = OrderedDict(
                 loss=loss,
                 l1_loss=l1_loss,
                 p_loss=p_loss,
-                kl_loss=kl_loss,
+                quantization_loss=quantization_loss,
                 g_loss=g_loss,
             )
 
@@ -233,7 +230,7 @@ def train_epoch_aekl(
 
 
 @torch.no_grad()
-def eval_aekl(
+def eval_vqgan(
     model: nn.Module,
     discriminator: nn.Module,
     perceptual_loss: nn.Module,
@@ -255,11 +252,9 @@ def eval_aekl(
 
         with autocast(enabled=True):
             # GENERATOR
-            reconstruction, z_mu, z_sigma = model(x=images)
+            reconstruction, quantization_loss = model(x=images)
             l1_loss = F.l1_loss(reconstruction.float(), images.float())
             p_loss = perceptual_loss(reconstruction.float(), images.float())
-            kl_loss = 0.5 * torch.sum(z_mu.pow(2) + z_sigma.pow(2) - torch.log(z_sigma.pow(2)) - 1, dim=[1, 2, 3])
-            kl_loss = torch.sum(kl_loss) / kl_loss.shape[0]
 
             if adv_weight > 0:
                 logits_fake = discriminator(reconstruction.contiguous().float())[-1]
@@ -277,12 +272,12 @@ def eval_aekl(
             else:
                 discriminator_loss = torch.tensor([0.0]).to(device)
 
-            loss = l1_loss + kl_weight * kl_loss + perceptual_weight * p_loss + adv_weight * generator_loss
+            loss = l1_loss + quantization_loss + perceptual_weight * p_loss + adv_weight * generator_loss
 
             loss = loss.mean()
             l1_loss = l1_loss.mean()
             p_loss = p_loss.mean()
-            kl_loss = kl_loss.mean()
+            quantization_loss = quantization_loss.mean()
             g_loss = generator_loss.mean()
             d_loss = discriminator_loss.mean()
 
@@ -290,7 +285,7 @@ def eval_aekl(
                 loss=loss,
                 l1_loss=l1_loss,
                 p_loss=p_loss,
-                kl_loss=kl_loss,
+                quantization_loss=quantization_loss,
                 g_loss=g_loss,
                 d_loss=d_loss,
             )

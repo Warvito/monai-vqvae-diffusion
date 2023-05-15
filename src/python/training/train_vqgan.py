@@ -6,13 +6,13 @@ from pathlib import Path
 import torch
 import torch.optim as optim
 from generative.losses.perceptual import PerceptualLoss
-from generative.networks.nets import AutoencoderKL
+from generative.networks.nets import VQVAE
 from generative.networks.nets.patchgan_discriminator import PatchDiscriminator
 from monai.config import print_config
 from monai.utils import set_determinism
 from omegaconf import OmegaConf
 from tensorboardX import SummaryWriter
-from training_functions import train_aekl
+from training_functions import train_vqgan
 from util import get_dataloader, log_mlflow
 
 warnings.filterwarnings("ignore")
@@ -74,7 +74,7 @@ def main(args):
 
     print("Creating model...")
     config = OmegaConf.load(args.config_file)
-    model = AutoencoderKL(**config["stage1"]["params"])
+    model = VQVAE(**config["stage1"]["params"])
     discriminator = PatchDiscriminator(**config["discriminator"]["params"])
     perceptual_loss = PerceptualLoss(**config["perceptual_network"]["params"])
 
@@ -110,7 +110,7 @@ def main(args):
 
     # Train model
     print(f"Starting Training")
-    val_loss = train_aekl(
+    val_loss = train_vqgan(
         model=model,
         discriminator=discriminator,
         perceptual_loss=perceptual_loss,
