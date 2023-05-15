@@ -12,8 +12,8 @@ stage1:
     num_res_layers: 2
     downsample_parameters: [[2, 4, 1, 1], [2, 4, 1, 1], [2, 4, 1, 1]]
     upsample_parameters: [[2, 4, 1, 1, 0], [2, 4, 1, 1, 0], [2, 4, 1, 1, 0]]
-    num_embeddings: 256
-    embedding_dim: 32
+    num_embeddings: 512
+    embedding_dim: 3
 
 discriminator:
   params:
