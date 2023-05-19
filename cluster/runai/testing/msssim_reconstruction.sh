@@ -1,7 +1,7 @@
 output_dir="/project/outputs/metrics/"
 test_ids="/project/outputs/ids/test.tsv"
-config_file="/project/configs/stage1/aekl_v0.yaml"
-stage1_path="/project/outputs/models/v0.2/autoencoder.pth"
+config_file="/project/configs/stage1/vqgan_v0.yaml"
+stage1_path="/project/outputs/models/autoencoder.pth"
 seed=42
 batch_size=16
 num_workers=8
@@ -16,7 +16,7 @@ runai submit \
   --run-as-user \
   --host-ipc \
   --project wds20 \
-  --volume /nfs/home/wds20/projects/generative_mimic/:/project/ \
+  --volume /nfs/home/wds20/projects/monai-vqvae-diffusion/:/project/ \
   --volume /nfs/home/wds20/datasets/MIMIC-CXR-JPG_v2.0.0/:/data/ \
   --command -- python3 /project/src/python/testing/compute_msssim_reconstruction.py \
       --seed=${seed} \

@@ -63,7 +63,9 @@ def main(args):
         x = batch["image"].to(device)
 
         with torch.no_grad():
-            x_recon = stage1.reconstruct(x)
+            z = stage1.encode(x)
+            e = stage1.quantize(z)
+            x_recon = stage1.decode(e)
 
         ms_ssim_list.append(ms_ssim(x, x_recon))
         filenames.extend(batch["image_meta_dict"]["filename_or_obj"])
