@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 from generative.metrics import MultiScaleSSIMMetric
-from generative.networks.nets import AutoencoderKL
+from generative.networks.nets import VQVAE
 from monai.config import print_config
 from monai.utils import set_determinism
 from omegaconf import OmegaConf
@@ -49,7 +49,7 @@ def main(args):
     print("Creating model...")
     device = torch.device("cuda")
     config = OmegaConf.load(args.config_file)
-    stage1 = AutoencoderKL(**config["stage1"]["params"])
+    stage1 = VQVAE(**config["stage1"]["params"])
     stage1.load_state_dict(torch.load(args.stage1_path))
     stage1 = stage1.to(device)
     stage1.eval()

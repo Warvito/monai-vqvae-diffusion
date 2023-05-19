@@ -1,7 +1,7 @@
 output_dir="/project/outputs/samples_unconditioned/"
-stage1_path="/project/outputs/models/v0.2/autoencoder.pth"
-diffusion_path="/project/outputs/models/v0.2/diffusion_model.pth"
-stage1_config_file_path="/project/configs/stage1/aekl_v0.yaml"
+stage1_path="/project/outputs/models/autoencoder.pth"
+diffusion_path="/project/outputs/models/diffusion_model.pth"
+stage1_config_file_path="/project/configs/stage1/vqgan_v0.yaml"
 diffusion_config_file_path="/project/configs/ldm/ldm_v0.yaml"
 start_seed=0
 stop_seed=1000
@@ -13,7 +13,7 @@ scale_factor=0.3
 num_inference_steps=200
 
 runai submit \
-  --name  sampling-mimic-0 \
+  --name  sampling-mimic \
   --image aicregistry:5000/wds20:ldm_mimic \
   --backoff-limit 0 \
   --gpu 1 \
@@ -22,7 +22,7 @@ runai submit \
   --run-as-user \
   --host-ipc \
   --project wds20 \
-  --volume /nfs/home/wds20/projects/generative_mimic/:/project/ \
+  --volume /nfs/home/wds20/projects/monai-vqvae-diffusion/:/project/ \
   --command -- python3 /project/src/python/testing/sample_images.py \
       --output_dir=${output_dir} \
       --stage1_path=${stage1_path} \

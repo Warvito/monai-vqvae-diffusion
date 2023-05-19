@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from generative.networks.nets import AutoencoderKL, DiffusionModelUNet
+from generative.networks.nets import VQVAE, DiffusionModelUNet
 from generative.networks.schedulers import DDIMScheduler
 from monai.config import print_config
 from monai.utils import set_determinism
@@ -48,7 +48,7 @@ def main(args):
     device = torch.device("cuda")
 
     config = OmegaConf.load(args.stage1_config_file_path)
-    stage1 = AutoencoderKL(**config["stage1"]["params"])
+    stage1 = VQVAE(**config["stage1"]["params"])
     stage1.load_state_dict(torch.load(args.stage1_path))
     stage1.to(device)
     stage1.eval()
