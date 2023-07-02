@@ -3,6 +3,6 @@ transformer:
   params:
     num_tokens: 513
     max_seq_len: 4096
-    attn_layers_dim: 96
-    attn_layers_depth: 12
+    attn_layers_dim: 64
+    attn_layers_depth: 8
     attn_layers_heads: 8
