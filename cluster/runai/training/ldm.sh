@@ -13,8 +13,8 @@ extended_report=0
 experiment="LDM"
 
 runai submit \
-  --name cxr-ldm-v0 \
-  --image aicregistry:5000/wds20:ldm_mimic \
+  --name vqvae-ldm-v0 \
+  --image aicregistry:5000/wds20:ldm_vqvae \
   --backoff-limit 0 \
   --gpu 8 \
   --cpu 32 \

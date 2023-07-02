@@ -11,8 +11,8 @@ num_workers=64
 experiment="VQGAN"
 
 runai submit \
-  --name cxr-vqgan-v0 \
-  --image aicregistry:5000/wds20:ldm_mimic \
+  --name vqvae-vqgan-v0 \
+  --image aicregistry:5000/wds20:ldm_vqvae \
   --backoff-limit 0 \
   --gpu 8 \
   --cpu 32 \
