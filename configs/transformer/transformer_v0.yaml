@@ -1,4 +1,4 @@
-ldm:
+transformer:
   base_lr: 0.000025
   params:
     num_tokens: 513
