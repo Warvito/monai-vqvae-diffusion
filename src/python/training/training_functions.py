@@ -532,7 +532,6 @@ def train_transformer(
         device=device,
         step=len(train_loader) * start_epoch,
         writer=writer_val,
-        sample=False,
     )
     print(f"epoch {start_epoch} val loss: {val_loss:.4f}")
 
@@ -558,7 +557,6 @@ def train_transformer(
                 device=device,
                 step=len(train_loader) * epoch,
                 writer=writer_val,
-                sample=True if (epoch + 1) % (eval_freq * 2) == 0 else False,
             )
 
             print(f"epoch {epoch + 1} val loss: {val_loss:.4f}")
