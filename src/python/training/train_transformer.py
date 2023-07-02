@@ -84,7 +84,7 @@ def main(args):
         validation_ids=args.validation_ids,
         num_workers=args.num_workers,
         model_type="diffusion",
-        extended_report=bool(args.extended_report),
+        extended_report=False,
     )
 
     # Load Autoencoder to produce the latent representations

@@ -16,8 +16,9 @@ runai submit \
   --name vqvae-ldm-v0 \
   --image aicregistry:5000/wds20:ldm_vqvae \
   --backoff-limit 0 \
-  --gpu 8 \
-  --cpu 32 \
+  --gpu 4 \
+  --cpu 128 \
+  --memory-limit 256G \
   --large-shm \
   --run-as-user \
   --node-type "A100" \
