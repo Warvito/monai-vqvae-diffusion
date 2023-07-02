@@ -109,7 +109,7 @@ def main(args):
     stage1 = stage1.to(device)
     transformer = transformer.to(device)
 
-    optimizer = optim.AdamW(transformer.parameters(), lr=config["ldm"]["base_lr"])
+    optimizer = optim.AdamW(transformer.parameters(), lr=config["transformer"]["base_lr"])
 
     # Get Checkpoint
     best_loss = float("inf")
