@@ -599,6 +599,8 @@ def train_epoch_transformer(
     ce_loss = CrossEntropyLoss()
 
     raw_model = model.module if hasattr(model, "module") else model
+    raw_stage1 = stage1.module if hasattr(stage1, "module") else stage1
+
     pbar = tqdm(enumerate(loader), total=len(loader))
     for step, x in pbar:
         images = x["image"].to(device)
@@ -612,7 +614,7 @@ def train_epoch_transformer(
             latent = latent[:, ordering.get_sequence_ordering()]
 
             target = latent.clone()
-            latent = F.pad(latent, (1, 0), "constant", stage1.model.num_embeddings)
+            latent = F.pad(latent, (1, 0), "constant", raw_stage1.model.num_embeddings)
             latent = latent[:, :-1]
             latent = latent.long()
 
@@ -654,6 +656,7 @@ def eval_transformer(
 
     ce_loss = CrossEntropyLoss()
     raw_model = model.module if hasattr(model, "module") else model
+    raw_stage1 = stage1.module if hasattr(stage1, "module") else stage1
 
     for x in loader:
         images = x["image"].to(device)
@@ -666,7 +669,7 @@ def eval_transformer(
             latent = latent[:, ordering.get_sequence_ordering()]
 
             target = latent.clone()
-            latent = F.pad(latent, (1, 0), "constant", stage1.model.num_embeddings)
+            latent = F.pad(latent, (1, 0), "constant", raw_stage1.model.num_embeddings)
             latent = latent[:, :-1]
             latent = latent.long()
 
