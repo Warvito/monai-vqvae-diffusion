@@ -75,11 +75,7 @@ def main(args):
         with torch.no_grad():
             progress_bar = tqdm(scheduler.timesteps)
             for t in progress_bar:
-                noise_input = torch.cat([noise] * 2)
-                model_output = diffusion(noise_input, timesteps=torch.Tensor((t,)).to(noise.device).long())
-                noise_pred_uncond, noise_pred_text = model_output.chunk(2)
-                noise_pred = noise_pred_uncond + args.guidance_scale * (noise_pred_text - noise_pred_uncond)
-
+                noise_pred = diffusion(noise, timesteps=torch.Tensor((t,)).to(noise.device).long())
                 noise, _ = scheduler.step(noise_pred, t, noise)
 
         with torch.no_grad():
