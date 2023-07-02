@@ -15,7 +15,6 @@ from monai.utils import set_determinism
 from omegaconf import OmegaConf
 from PIL import Image
 from tqdm import tqdm
-from transformers import CLIPTextModel, CLIPTokenizer
 
 
 def parse_args():
@@ -69,22 +68,6 @@ def main(args):
     )
     scheduler.set_timesteps(args.num_inference_steps)
 
-    tokenizer = CLIPTokenizer.from_pretrained("stabilityai/stable-diffusion-2-1-base", subfolder="tokenizer")
-    text_encoder = CLIPTextModel.from_pretrained("stabilityai/stable-diffusion-2-1-base", subfolder="text_encoder")
-
-    prompt = ["", args.prompt.replace("_", " ")]
-    text_inputs = tokenizer(
-        prompt,
-        padding="max_length",
-        max_length=tokenizer.model_max_length,
-        truncation=True,
-        return_tensors="pt",
-    )
-    text_input_ids = text_inputs.input_ids
-
-    prompt_embeds = text_encoder(text_input_ids.squeeze(1))
-    prompt_embeds = prompt_embeds[0].to(device)
-
     for i in range(args.start_seed, args.stop_seed):
         set_determinism(seed=i)
         noise = torch.randn((1, config["ldm"]["params"]["in_channels"], args.x_size, args.y_size)).to(device)
@@ -93,9 +76,7 @@ def main(args):
             progress_bar = tqdm(scheduler.timesteps)
             for t in progress_bar:
                 noise_input = torch.cat([noise] * 2)
-                model_output = diffusion(
-                    noise_input, timesteps=torch.Tensor((t,)).to(noise.device).long(), context=prompt_embeds
-                )
+                model_output = diffusion(noise_input, timesteps=torch.Tensor((t,)).to(noise.device).long())
                 noise_pred_uncond, noise_pred_text = model_output.chunk(2)
                 noise_pred = noise_pred_uncond + args.guidance_scale * (noise_pred_text - noise_pred_uncond)
 

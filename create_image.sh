@@ -4,7 +4,7 @@
 #
 # $ create_docker_image.sh
 set -ex
-TAG=ldm_mimic
+TAG=ldm_vqvae
 
 docker build --network=host --tag "aicregistry:5000/${USER}:${TAG}" -f Dockerfile . \
   --build-arg USER_ID=$(id -u) \

@@ -1,0 +1,8 @@
+ldm:
+  base_lr: 0.000025
+  params:
+    num_tokens: 513
+    max_seq_len: 4096
+    attn_layers_dim: 96
+    attn_layers_depth: 12
+    attn_layers_heads: 8

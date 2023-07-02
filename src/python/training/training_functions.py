@@ -9,6 +9,7 @@ from generative.losses.adversarial_loss import PatchAdversarialLoss
 from pynvml.smi import nvidia_smi
 from tensorboardX import SummaryWriter
 from torch.cuda.amp import GradScaler, autocast
+from torch.nn import CrossEntropyLoss
 from tqdm import tqdm
 from util import log_ldm_sample_unconditioned, log_reconstructions
 
@@ -304,13 +305,12 @@ def eval_vqgan(
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Latent Diffusion Model Unconditioned
+# Latent Diffusion Model
 # ----------------------------------------------------------------------------------------------------------------------
 def train_ldm(
     model: nn.Module,
     stage1: nn.Module,
     scheduler: nn.Module,
-    text_encoder,
     start_epoch: int,
     best_loss: float,
     train_loader: torch.utils.data.DataLoader,
@@ -331,7 +331,6 @@ def train_ldm(
         model=model,
         stage1=stage1,
         scheduler=scheduler,
-        text_encoder=text_encoder,
         loader=val_loader,
         device=device,
         step=len(train_loader) * start_epoch,
@@ -346,7 +345,6 @@ def train_ldm(
             model=model,
             stage1=stage1,
             scheduler=scheduler,
-            text_encoder=text_encoder,
             loader=train_loader,
             optimizer=optimizer,
             device=device,
@@ -361,7 +359,6 @@ def train_ldm(
                 model=model,
                 stage1=stage1,
                 scheduler=scheduler,
-                text_encoder=text_encoder,
                 loader=val_loader,
                 device=device,
                 step=len(train_loader) * epoch,
@@ -398,7 +395,6 @@ def train_epoch_ldm(
     model: nn.Module,
     stage1: nn.Module,
     scheduler: nn.Module,
-    text_encoder,
     loader: torch.utils.data.DataLoader,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
@@ -412,7 +408,6 @@ def train_epoch_ldm(
     pbar = tqdm(enumerate(loader), total=len(loader))
     for step, x in pbar:
         images = x["image"].to(device)
-        reports = x["report"].to(device)
         timesteps = torch.randint(0, scheduler.num_train_timesteps, (images.shape[0],), device=device).long()
 
         optimizer.zero_grad(set_to_none=True)
@@ -420,12 +415,9 @@ def train_epoch_ldm(
             with torch.no_grad():
                 e = stage1(images) * scale_factor
 
-            prompt_embeds = text_encoder(reports.squeeze(1))
-            prompt_embeds = prompt_embeds[0]
-
             noise = torch.randn_like(e).to(device)
             noisy_e = scheduler.add_noise(original_samples=e, noise=noise, timesteps=timesteps)
-            noise_pred = model(x=noisy_e, timesteps=timesteps, context=prompt_embeds)
+            noise_pred = model(x=noisy_e, timesteps=timesteps)
 
             if scheduler.prediction_type == "v_prediction":
                 # Use v-prediction parameterization
@@ -453,7 +445,6 @@ def eval_ldm(
     model: nn.Module,
     stage1: nn.Module,
     scheduler: nn.Module,
-    text_encoder,
     loader: torch.utils.data.DataLoader,
     device: torch.device,
     step: int,
@@ -468,18 +459,14 @@ def eval_ldm(
 
     for x in loader:
         images = x["image"].to(device)
-        reports = x["report"].to(device)
         timesteps = torch.randint(0, scheduler.num_train_timesteps, (images.shape[0],), device=device).long()
 
         with autocast(enabled=True):
             e = stage1(images) * scale_factor
 
-            prompt_embeds = text_encoder(reports.squeeze(1))
-            prompt_embeds = prompt_embeds[0]
-
             noise = torch.randn_like(e).to(device)
             noisy_e = scheduler.add_noise(original_samples=e, noise=noise, timesteps=timesteps)
-            noise_pred = model(x=noisy_e, timesteps=timesteps, context=prompt_embeds)
+            noise_pred = model(x=noisy_e, timesteps=timesteps)
 
             if scheduler.prediction_type == "v_prediction":
                 # Use v-prediction parameterization
@@ -505,12 +492,205 @@ def eval_ldm(
             model=raw_model,
             stage1=raw_stage1,
             scheduler=scheduler,
-            text_encoder=text_encoder,
             spatial_shape=tuple(e.shape[1:]),
             writer=writer,
             step=step,
             device=device,
             scale_factor=scale_factor,
         )
+
+    return total_losses["loss"]
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Autoregressive transformer
+# ----------------------------------------------------------------------------------------------------------------------
+def train_transformer(
+    model: nn.Module,
+    ordering,
+    stage1: nn.Module,
+    start_epoch: int,
+    best_loss: float,
+    train_loader: torch.utils.data.DataLoader,
+    val_loader: torch.utils.data.DataLoader,
+    optimizer: torch.optim.Optimizer,
+    n_epochs: int,
+    eval_freq: int,
+    writer_train: SummaryWriter,
+    writer_val: SummaryWriter,
+    device: torch.device,
+    run_dir: Path,
+) -> float:
+    scaler = GradScaler()
+    raw_model = model.module if hasattr(model, "module") else model
+
+    val_loss = eval_transformer(
+        model=model,
+        ordering=ordering,
+        stage1=stage1,
+        loader=val_loader,
+        device=device,
+        step=len(train_loader) * start_epoch,
+        writer=writer_val,
+        sample=False,
+    )
+    print(f"epoch {start_epoch} val loss: {val_loss:.4f}")
+
+    for epoch in range(start_epoch, n_epochs):
+        train_epoch_transformer(
+            model=model,
+            ordering=ordering,
+            stage1=stage1,
+            loader=train_loader,
+            optimizer=optimizer,
+            device=device,
+            epoch=epoch,
+            writer=writer_train,
+            scaler=scaler,
+        )
+
+        if (epoch + 1) % eval_freq == 0:
+            val_loss = eval_transformer(
+                model=model,
+                ordering=ordering,
+                stage1=stage1,
+                loader=val_loader,
+                device=device,
+                step=len(train_loader) * epoch,
+                writer=writer_val,
+                sample=True if (epoch + 1) % (eval_freq * 2) == 0 else False,
+            )
+
+            print(f"epoch {epoch + 1} val loss: {val_loss:.4f}")
+            print_gpu_memory_report()
+
+            # Save checkpoint
+            checkpoint = {
+                "epoch": epoch + 1,
+                "transformer": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "best_loss": best_loss,
+            }
+            torch.save(checkpoint, str(run_dir / "checkpoint.pth"))
+
+            if val_loss <= best_loss:
+                print(f"New best val loss {val_loss}")
+                best_loss = val_loss
+                torch.save(raw_model.state_dict(), str(run_dir / "best_model.pth"))
+
+    print(f"Training finished!")
+    print(f"Saving final model...")
+    torch.save(raw_model.state_dict(), str(run_dir / "final_model.pth"))
+
+    return val_loss
+
+
+def train_epoch_transformer(
+    model: nn.Module,
+    ordering,
+    stage1: nn.Module,
+    loader: torch.utils.data.DataLoader,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    epoch: int,
+    writer: SummaryWriter,
+    scaler: GradScaler,
+) -> None:
+    model.train()
+
+    ce_loss = CrossEntropyLoss()
+
+    raw_model = model.module if hasattr(model, "module") else model
+    pbar = tqdm(enumerate(loader), total=len(loader))
+    for step, x in pbar:
+        images = x["image"].to(device)
+
+        optimizer.zero_grad(set_to_none=True)
+        with autocast(enabled=True):
+            with torch.no_grad():
+                latent = stage1(images)
+
+            latent = latent.reshape(latent.shape[0], -1)
+            latent = latent[:, ordering.get_sequence_ordering()]
+
+            target = latent.clone()
+            latent = F.pad(latent, (1, 0), "constant", stage1.model.num_embeddings)
+            latent = latent[:, :-1]
+            latent = latent.long()
+
+            max_seq_len = raw_model.max_seq_len
+            start = 0
+            logits = model(x=latent)
+            target = target[:, start : start + max_seq_len]
+
+            logits = logits.transpose(1, 2)
+
+            loss = ce_loss(logits, target)
+
+        losses = OrderedDict(loss=loss)
+
+        scaler.scale(losses["loss"]).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
+        writer.add_scalar("lr", get_lr(optimizer), epoch * len(loader) + step)
+
+        for k, v in losses.items():
+            writer.add_scalar(f"{k}", v.item(), epoch * len(loader) + step)
+
+        pbar.set_postfix({"epoch": epoch, "loss": f"{losses['loss'].item():.5f}", "lr": f"{get_lr(optimizer):.6f}"})
+
+
+@torch.no_grad()
+def eval_transformer(
+    model: nn.Module,
+    ordering,
+    stage1: nn.Module,
+    loader: torch.utils.data.DataLoader,
+    device: torch.device,
+    step: int,
+    writer: SummaryWriter,
+) -> float:
+    model.eval()
+    total_losses = OrderedDict()
+
+    ce_loss = CrossEntropyLoss()
+    raw_model = model.module if hasattr(model, "module") else model
+
+    for x in loader:
+        images = x["image"].to(device)
+
+        with autocast(enabled=True):
+            with torch.no_grad():
+                latent = stage1(images)
+
+            latent = latent.reshape(latent.shape[0], -1)
+            latent = latent[:, ordering.get_sequence_ordering()]
+
+            target = latent.clone()
+            latent = F.pad(latent, (1, 0), "constant", stage1.model.num_embeddings)
+            latent = latent[:, :-1]
+            latent = latent.long()
+
+            max_seq_len = raw_model.max_seq_len
+            start = 0
+            logits = model(x=latent)
+            target = target[:, start : start + max_seq_len]
+
+            logits = logits.transpose(1, 2)
+
+            loss = ce_loss(logits, target)
+
+        loss = loss.mean()
+        losses = OrderedDict(loss=loss)
+
+        for k, v in losses.items():
+            total_losses[k] = total_losses.get(k, 0) + v.item() * images.shape[0]
+
+    for k in total_losses.keys():
+        total_losses[k] /= len(loader.dataset)
+
+    for k, v in total_losses.items():
+        writer.add_scalar(f"{k}", v, step)
 
     return total_losses["loss"]

@@ -7,13 +7,14 @@ import mlflow.pytorch
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from generative.networks.nets import DiffusionModelUNet
-from generative.networks.schedulers import DDPMScheduler
+from generative.networks.nets import DecoderOnlyTransformer
+from generative.utils.enums import OrderingType
+from generative.utils.ordering import Ordering
 from monai.config import print_config
 from monai.utils import set_determinism
 from omegaconf import OmegaConf
 from tensorboardX import SummaryWriter
-from training_functions import train_ldm
+from training_functions import train_transformer
 from util import get_dataloader, log_mlflow
 
 warnings.filterwarnings("ignore")
@@ -28,12 +29,10 @@ def parse_args():
     parser.add_argument("--validation_ids", help="Location of file with validation ids.")
     parser.add_argument("--config_file", help="Location of file with validation ids.")
     parser.add_argument("--stage1_uri", help="Path readable by load_model.")
-    parser.add_argument("--scale_factor", type=float, help="Path readable by load_model.")
     parser.add_argument("--batch_size", type=int, default=256, help="Training batch size.")
     parser.add_argument("--n_epochs", type=int, default=25, help="Number of epochs to train.")
     parser.add_argument("--eval_freq", type=int, default=10, help="Number of epochs to between evaluations.")
     parser.add_argument("--num_workers", type=int, default=8, help="Number of loader workers")
-    parser.add_argument("--extended_report", type=int, default=1, help="Define if use extended reports")
     parser.add_argument("--experiment", help="Mlflow experiment name.")
 
     args = parser.parse_args()
@@ -48,7 +47,7 @@ class Stage1Wrapper(nn.Module):
         self.model = model
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        e = self.model.encode_stage_2_inputs(x)
+        e = self.model.index_quantize(x)
         return e
 
 
@@ -97,19 +96,20 @@ def main(args):
     # Create the diffusion model
     print("Creating model...")
     config = OmegaConf.load(args.config_file)
-    diffusion = DiffusionModelUNet(**config["ldm"].get("params", dict()))
-    scheduler = DDPMScheduler(**config["ldm"].get("scheduler", dict()))
+    transformer = DecoderOnlyTransformer(**config["transformer"].get("params", dict()))
+
+    ordering = Ordering(ordering_type=OrderingType.RASTER_SCAN.value, spatial_dims=2, dimensions=(1, 64, 64))
 
     print(f"Let's use {torch.cuda.device_count()} GPUs!")
     device = torch.device("cuda")
     if torch.cuda.device_count() > 1:
         stage1 = torch.nn.DataParallel(stage1)
-        diffusion = torch.nn.DataParallel(diffusion)
+        transformer = torch.nn.DataParallel(transformer)
 
     stage1 = stage1.to(device)
-    diffusion = diffusion.to(device)
+    transformer = transformer.to(device)
 
-    optimizer = optim.AdamW(diffusion.parameters(), lr=config["ldm"]["base_lr"])
+    optimizer = optim.AdamW(transformer.parameters(), lr=config["ldm"]["base_lr"])
 
     # Get Checkpoint
     best_loss = float("inf")
@@ -117,7 +117,7 @@ def main(args):
     if resume:
         print(f"Using checkpoint!")
         checkpoint = torch.load(str(run_dir / "checkpoint.pth"))
-        diffusion.load_state_dict(checkpoint["diffusion"])
+        transformer.load_state_dict(checkpoint["transformer"])
         # Issue loading optimizer https://github.com/pytorch/pytorch/issues/2830
         optimizer.load_state_dict(checkpoint["optimizer"])
         start_epoch = checkpoint["epoch"]
@@ -127,10 +127,10 @@ def main(args):
 
     # Train model
     print(f"Starting Training")
-    val_loss = train_ldm(
-        model=diffusion,
+    val_loss = train_transformer(
+        model=transformer,
+        ordering=ordering,
         stage1=stage1,
-        scheduler=scheduler,
         start_epoch=start_epoch,
         best_loss=best_loss,
         train_loader=train_loader,
@@ -142,11 +142,10 @@ def main(args):
         writer_val=writer_val,
         device=device,
         run_dir=run_dir,
-        scale_factor=args.scale_factor,
     )
 
     log_mlflow(
-        model=diffusion,
+        model=transformer,
         config=config,
         args=args,
         experiment=args.experiment,

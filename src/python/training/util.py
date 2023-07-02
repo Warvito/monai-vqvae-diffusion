@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from custom_transforms import ApplyTokenizerd, LoadJSONd, RandomSelectExcerptd
 from mlflow import start_run
 from monai import transforms
 from monai.data import PersistentDataset
@@ -61,18 +60,13 @@ def get_dataloader(
             transforms.EnsureChannelFirstd(keys=["image"]),
             transforms.Lambdad(
                 keys=["image"],
-                func=lambda x: x[0, :, :][
-                    None,
-                ],
+                func=lambda x: x[0, :, :][None],
             ),
             transforms.Rotate90d(keys=["image"], k=-1, spatial_axes=(0, 1)),  # Fix flipped image read
             transforms.Flipd(keys=["image"], spatial_axis=1),  # Fix flipped image read
             transforms.ScaleIntensityRanged(keys=["image"], a_min=0.0, a_max=255.0, b_min=0.0, b_max=1.0, clip=True),
             transforms.CenterSpatialCropd(keys=["image"], roi_size=(512, 512)),
             transforms.ToTensord(keys=["image"]),
-            LoadJSONd(keys=["report"]),
-            RandomSelectExcerptd(keys=["report"], sentence_key="sentences", max_n_sentences=5),
-            ApplyTokenizerd(keys=["report"]),
         ]
     )
     if model_type == "autoencoder":
@@ -82,9 +76,7 @@ def get_dataloader(
                 transforms.EnsureChannelFirstd(keys=["image"]),
                 transforms.Lambdad(
                     keys=["image"],
-                    func=lambda x: x[0, :, :][
-                        None,
-                    ],
+                    func=lambda x: x[0, :, :][None],
                 ),
                 transforms.Rotate90d(keys=["image"], k=-1, spatial_axes=(0, 1)),  # Fix flipped image read
                 transforms.Flipd(keys=["image"], spatial_axis=1),  # Fix flipped image read
@@ -102,9 +94,6 @@ def get_dataloader(
                 ),
                 transforms.RandFlipd(keys=["image"], spatial_axis=1, prob=0.5),
                 transforms.ToTensord(keys=["image"]),
-                LoadJSONd(keys=["report"]),
-                RandomSelectExcerptd(keys=["report"], sentence_key="sentences", max_n_sentences=5),
-                ApplyTokenizerd(keys=["report"]),
             ]
         )
     if model_type == "diffusion":
@@ -114,9 +103,7 @@ def get_dataloader(
                 transforms.EnsureChannelFirstd(keys=["image"]),
                 transforms.Lambdad(
                     keys=["image"],
-                    func=lambda x: x[0, :, :][
-                        None,
-                    ],
+                    func=lambda x: x[0, :, :][None],
                 ),
                 transforms.Rotate90d(keys=["image"], k=-1, spatial_axes=(0, 1)),  # Fix flipped image read
                 transforms.Flipd(keys=["image"], spatial_axis=1),  # Fix flipped image read
@@ -133,16 +120,6 @@ def get_dataloader(
                     prob=0.10,
                 ),
                 transforms.ToTensord(keys=["image"]),
-                LoadJSONd(keys=["report"]),
-                RandomSelectExcerptd(keys=["report"], sentence_key="sentences", max_n_sentences=5),
-                ApplyTokenizerd(keys=["report"]),
-                transforms.RandLambdad(
-                    keys=["report"],
-                    prob=0.10,
-                    func=lambda x: torch.cat(
-                        (49406 * torch.ones(1, 1), 49407 * torch.ones(1, x.shape[1] - 1)), 1
-                    ).long(),
-                ),  # 49406: BOS token 49407: PAD token
             ]
         )
 
@@ -254,7 +231,6 @@ def log_reconstructions(
 def log_ldm_sample_unconditioned(
     model: nn.Module,
     stage1: nn.Module,
-    text_encoder,
     scheduler: nn.Module,
     spatial_shape: Tuple,
     writer: SummaryWriter,
@@ -265,12 +241,8 @@ def log_ldm_sample_unconditioned(
     latent = torch.randn((1,) + spatial_shape)
     latent = latent.to(device)
 
-    prompt_embeds = torch.cat((49406 * torch.ones(1, 1), 49407 * torch.ones(1, 76)), 1).long()
-    prompt_embeds = text_encoder(prompt_embeds.squeeze(1))
-    prompt_embeds = prompt_embeds[0]
-
     for t in tqdm(scheduler.timesteps, ncols=70):
-        noise_pred = model(x=latent, timesteps=torch.asarray((t,)).to(device), context=prompt_embeds)
+        noise_pred = model(x=latent, timesteps=torch.asarray((t,)).to(device))
         latent, _ = scheduler.step(noise_pred, t, latent)
 
     x_hat = stage1.model.decode(latent / scale_factor)
