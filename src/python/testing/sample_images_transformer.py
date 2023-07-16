@@ -44,7 +44,7 @@ def main(args):
     stage1.to(device)
     stage1.eval()
 
-    config = OmegaConf.load(args.diffusion_config_file_path)
+    config = OmegaConf.load(args.transformer_config_file_path)
     transformer = DecoderOnlyTransformer(**config["transformer"].get("params", dict()))
     transformer.load_state_dict(torch.load(args.transformer_path))
     transformer.to(device)
