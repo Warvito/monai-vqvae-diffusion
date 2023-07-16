@@ -14,6 +14,7 @@ def parse_args():
 
     parser.add_argument("--stage1_mlflow_path", help="Path to the MLFlow artifact of the stage1.")
     parser.add_argument("--diffusion_mlflow_path", help="Path to the MLFlow artifact of the diffusion model.")
+    parser.add_argument("--transformer_mlflow_path", help="Path to the MLFlow artifact of the diffusion model.")
     parser.add_argument("--output_dir", help="Path to save the .pth file of the diffusion model.")
 
     args = parser.parse_args()
@@ -23,6 +24,9 @@ def parse_args():
 def main(args):
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
+
+    transformer_model = mlflow.pytorch.load_model(args.transformer_mlflow_path)
+    torch.save(transformer_model.state_dict(), output_dir / "transformer.pth")
 
     stage1_model = mlflow.pytorch.load_model(args.stage1_mlflow_path)
     torch.save(stage1_model.state_dict(), output_dir / "autoencoder.pth")
