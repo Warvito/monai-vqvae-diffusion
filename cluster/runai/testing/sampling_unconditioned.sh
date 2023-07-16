@@ -11,7 +11,7 @@ scale_factor=0.3
 num_inference_steps=200
 
 runai submit \
-  --name  sampling-mimic \
+  --name  sampling-mimic-ldm \
   --image aicregistry:5000/wds20:ldm_vqvae \
   --backoff-limit 0 \
   --gpu 1 \

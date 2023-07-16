@@ -7,7 +7,7 @@ start_seed=0
 stop_seed=1000
 
 runai submit \
-  --name  sampling-mimic \
+  --name  sampling-mimic-transformer \
   --image aicregistry:5000/wds20:ldm_vqvae \
   --backoff-limit 0 \
   --gpu 1 \
