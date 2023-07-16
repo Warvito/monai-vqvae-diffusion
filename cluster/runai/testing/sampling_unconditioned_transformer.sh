@@ -1,11 +1,10 @@
-output_dir="/project/outputs/samples_unconditioned/"
+output_dir="/project/outputs/samples_unconditioned_transformer/"
 stage1_path="/project/outputs/models/autoencoder.pth"
-transformer_path="/project/outputs/models/diffusion_model.pth"
+transformer_path="/project/outputs/models/transformer.pth"
 stage1_config_file_path="/project/configs/stage1/vqgan_v0.yaml"
-transformer_config_file_path="/project/configs/ldm/ldm_v0.yaml"
+transformer_config_file_path="/project/configs/transformer/transformer_v0.yaml"
 start_seed=0
 stop_seed=1000
-
 
 runai submit \
   --name  sampling-mimic \
